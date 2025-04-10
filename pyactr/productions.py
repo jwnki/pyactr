@@ -812,24 +812,27 @@ class ProductionRules:
         """
         visualbuffer.state = visualbuffer._BUSY
         visualbuffer.autoattending = visualbuffer._BUSY
-        foveal_distance = utilities.calculate_distance(1, visualbuffer.environment.size, visualbuffer.environment.simulated_screen_size, visualbuffer.environment.viewing_distance)
         cf = tuple(visualbuffer.current_focus)
         newchunk = None
         encoding = 0
-        for st in stim:
-            if st['position'][0] > cf[0]-foveal_distance and st['position'][0] < cf[0]+foveal_distance and st['position'][1] > cf[1]-foveal_distance and st['position'][1] < cf[1]+foveal_distance:
-                if (not visualbuffer) or list(visualbuffer)[0].value.values != st['text']: #automatic buffer only of there is sth to buffer
-                    newchunk, encoding = visualbuffer.automatic_buffering(st, self.model_parameters)
-        time += encoding
-        yield Event(roundtime(time), name, self._UNKNOWN)
-        visualbuffer.state = visualbuffer._FREE
-        visualbuffer.autoattending = visualbuffer._FREE
+        if self.model_parameters["automatic_buffering"]:
+            foveal_distance = utilities.calculate_distance(1, visualbuffer.environment.size, visualbuffer.environment.simulated_screen_size, visualbuffer.environment.viewing_distance)
+            for st in stim:
+                if st['position'][0] > cf[0]-foveal_distance and st['position'][0] < cf[0]+foveal_distance and st['position'][1] > cf[1]-foveal_distance and st['position'][1] < cf[1]+foveal_distance:
+                    if (not visualbuffer) or list(visualbuffer)[0].value.values != st['text']: #automatic buffer only of there is sth to buffer
+                        newchunk, encoding = visualbuffer.automatic_buffering(st, self.model_parameters)
+            time += encoding
+            yield Event(roundtime(time), name, self._UNKNOWN)
+            visualbuffer.state = visualbuffer._FREE
+            visualbuffer.autoattending = visualbuffer._FREE
         if newchunk:
             if visualbuffer:
                 visualbuffer.modify(newchunk)
             else:
                 visualbuffer.add(newchunk, time)
             yield Event(roundtime(time), name, f"AUTOMATIC BUFFERING: {str(newchunk)}")
+        else:
+            yield Event(roundtime(time), name, self._UNKNOWN)
 
     def visualshift(self, name, visualbuffer, otherchunk, temp_actrvariables, time):
         """
