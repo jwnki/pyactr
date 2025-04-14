@@ -586,6 +586,7 @@ class TestAdditionModel(unittest.TestCase):
     """
     
     def setUp(self):
+        warnings.simplefilter("ignore")
         addition = modeltests.Addition()
         self.test = addition.model
         self.sim = self.test.simulation(trace=False)
@@ -1920,6 +1921,50 @@ class TestCompilation12(unittest.TestCase):
         g_compiled = self.model.goal.copy()
 
         self.assertEqual(g_noncompiled, g_compiled)
+
+class TestAutomaticBuffering(unittest.TestCase):
+    """
+    Testing automatic_buffering setting.
+    """
+
+    def _setup(self, automatic_buffering):
+        stimuli = [{0: {"text": "word", "position": (320, 180), "vis_delay": 3}}]
+        env = actr.Environment(focus_position=(320, 180))
+        self.model = actr.ACTRModel(
+            env, automatic_buffering=automatic_buffering, emma=False, emma_noise=False
+        )
+        self.sim = self.model.simulation(
+            gui=True,
+            realtime=False,
+            trace=False,
+            environment_process=env.environment_process,
+            stimuli=stimuli,
+            triggers="space",
+        )
+
+
+    def test_true(self):
+        self._setup(automatic_buffering=True)
+        vl = actr.makechunk(typename="_visuallocation", screen_x=320, screen_y=180)
+        vis_chunk = actr.makechunk(typename="_visual", value="word", screen_pos=vl)
+
+        while True:
+            self.sim.step()
+            if self.sim.current_event.action == f"AUTOMATIC BUFFERING: {str(vis_chunk)}":
+                break
+                chunk = self.model._ACTRModel__buffers["visual"].pop()
+                self.assertEqual(chunk, vis_chunk)
+                self.assertEqual(self.sim.show_time(), 0.03, msg=self.sim.show_time())
+
+
+    def test_false(self):
+        self._setup(automatic_buffering=False)
+        while True:
+            try:
+                self.sim.step()
+            except simpy.core.EmptySchedule:
+                break
+        self.assertEqual(self.model._ACTRModel__buffers["visual"], set())
 
 if __name__ == '__main__':
     unittest.main()
